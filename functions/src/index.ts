@@ -17,11 +17,16 @@ const configuration = new Configuration({
 });
 const openai = new OpenAIApi(configuration);
 
+const PROMPTS = {
+  CONTAINS_ARGUMENT: 'Is this text making an argument? Answer "yes" or "no". ',
+  CORE_ARGUMENT: "What is the core argument of this text? ",
+  WRITE_COUNTER: "Write a counterargument to this text. ",
+};
+
 const containsArgument = async (text: string): Promise<Answer> => {
+  functions.logger.info(`containsArgument core function, text: ${text}`, { structuredData: true });
   const response = await openai.createCompletion({
-    prompt: 'Is this text making an argument? Answer "yes" or "no". '.concat(
-      text
-    ),
+    prompt: PROMPTS.CONTAINS_ARGUMENT.concat(text),
     model: "text-davinci-002",
     temperature: 0.5,
     max_tokens: 2048,
@@ -30,6 +35,7 @@ const containsArgument = async (text: string): Promise<Answer> => {
     presence_penalty: 0,
     best_of: 1,
   });
+  functions.logger.info(`containsArgument core function, response.data: ${response.data}`, { structuredData: true });
 
   // Return "yes" or "no"
   const answer = response.data.choices[0].text;
@@ -40,10 +46,11 @@ const containsArgument = async (text: string): Promise<Answer> => {
   return answer.trim().toLowerCase() === "yes" ? Answer.Yes : Answer.No;
 };
 
-exports.containsArgument = functions.https.onCall(
-  (data: { text: string }, _context) => {
+exports.containsArgument = functions.https.onRequest(
+  async (request, response) => {
+  functions.logger.info(`containsArgument wrapper function, request.body: ${request.body}`, { structuredData: true });
     // Ensure that the text argument is provided
-    if (!data.text) {
+    if (!request.body.text) {
       throw new functions.https.HttpsError(
         "invalid-argument",
         "The function must be called with one argument 'text' containing the text to analyze."
@@ -51,20 +58,20 @@ exports.containsArgument = functions.https.onCall(
     }
 
     // Ensure that the caller has provided a string value for the text argument
-    if (typeof data.text !== "string") {
+    if (typeof request.body.text !== "string") {
       throw new functions.https.HttpsError(
         "invalid-argument",
         "The function must be called with one argument 'text' containing the text to analyze."
       );
     }
 
-    return containsArgument(data.text);
+    response.send(await containsArgument(request.body.text));
   }
 );
 
 const getCoreArgument = async (text: string): Promise<string> => {
   const response = await openai.createCompletion({
-    prompt: "What is the core argument of this text?".concat(text),
+    prompt: PROMPTS.CORE_ARGUMENT.concat(text),
     model: "text-davinci-002",
     temperature: 0.5,
     max_tokens: 2048,
@@ -84,10 +91,10 @@ const getCoreArgument = async (text: string): Promise<string> => {
 };
 
 // Export getCoreArgument function
-exports.getCoreArgument = functions.https.onCall(
-  (data: { text: string }, _context) => {
+exports.getCoreArgument = functions.https.onRequest(
+  async (request, response) => {
     // Ensure that the text argument is provided
-    if (!data.text) {
+    if (!request.body.text) {
       throw new functions.https.HttpsError(
         "invalid-argument",
         "The function must be called with one argument 'text' containing the text to analyze."
@@ -95,21 +102,21 @@ exports.getCoreArgument = functions.https.onCall(
     }
 
     // Ensure that the caller has provided a string value for the text argument
-    if (typeof data.text !== "string") {
+    if (typeof request.body.text !== "string") {
       throw new functions.https.HttpsError(
         "invalid-argument",
         "The function must be called with one argument 'text' containing the text to analyze."
       );
     }
 
-    return getCoreArgument(data.text);
+    response.send(await getCoreArgument(request.body.text));
   }
 );
 
 const writeCounterargument = async (text: string): Promise<string> => {
   // Analyze the text using GPT-3's language modeling capabilities
   const response = await openai.createCompletion({
-    prompt: "Write a counterargument to this text.".concat(text),
+    prompt: PROMPTS.WRITE_COUNTER.concat(text),
     model: "text-davinci-002",
     temperature: 0.5,
     max_tokens: 2048,
@@ -128,10 +135,10 @@ const writeCounterargument = async (text: string): Promise<string> => {
   return response.data.choices[0].text;
 };
 
-exports.writeCounterargument = functions.https.onCall(
-  (data: { text: string }, _context) => {
+exports.writeCounterargument = functions.https.onRequest(
+  async (request, response) => {
     // Ensure that the text argument is provided
-    if (!data.text) {
+    if (!request.body.text) {
       throw new functions.https.HttpsError(
         "invalid-argument",
         "The function must be called with one argument 'text' containing the text to analyze."
@@ -139,14 +146,14 @@ exports.writeCounterargument = functions.https.onCall(
     }
 
     // Ensure that the caller has provided a string value for the text argument
-    if (typeof data.text !== "string") {
+    if (typeof request.body.text !== "string") {
       throw new functions.https.HttpsError(
         "invalid-argument",
         "The function must be called with one argument 'text' containing the text to analyze."
       );
     }
 
-    return writeCounterargument(data.text);
+    response.send(await writeCounterargument(request.body.text));
   }
 );
 
@@ -166,24 +173,22 @@ const analyzeText = async (text: string): Promise<string> => {
   }
 };
 
-exports.analyzeText = functions.https.onCall(
-  (data: { text: string }, _context) => {
-    // Ensure that the text argument is provided
-    if (!data.text) {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "The function must be called with one argument 'text' containing the text to analyze."
-      );
-    }
-
-    // Ensure that the caller has provided a string value for the text argument
-    if (typeof data.text !== "string") {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "The function must be called with one argument 'text' containing the text to analyze."
-      );
-    }
-
-    return analyzeText(data.text);
+exports.analyzeText = functions.https.onRequest(async (request, response) => {
+  // Ensure that the text argument is provided
+  if (!request.body.text) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "The function must be called with one argument 'text' containing the text to analyze."
+    );
   }
-);
+
+  // Ensure that the caller has provided a string value for the text argument
+  if (typeof request.body.text !== "string") {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "The function must be called with one argument 'text' containing the text to analyze."
+    );
+  }
+
+  response.send(await analyzeText(request.body.text));
+});
