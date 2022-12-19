@@ -20,7 +20,7 @@ const openai = new OpenAIApi(configuration);
 const PROMPTS = {
   CONTAINS_ARGUMENT: 'Is this text making an argument? Answer "yes" or "no". ',
   CORE_ARGUMENT: "What is the core argument of this text? ",
-  WRITE_COUNTER: "Write a counterargument to this text. ",
+  WRITE_COUNTER: "Write the most persuasive counterargument to this text. ",
 };
 
 const containsArgument = async (text: string): Promise<Answer> => {
@@ -157,7 +157,13 @@ exports.writeCounterargument = functions.https.onRequest(
   }
 );
 
-const analyzeText = async (text: string): Promise<string> => {
+interface Analysis {
+  containsArgument: Answer;
+  coreArgument: string | null;
+  counterargument: string | null;
+}
+
+const analyzeText = async (text: string): Promise<Analysis> => {
   // Check if the text contains an argument
   const hasArg = await containsArgument(text);
 
@@ -167,9 +173,18 @@ const analyzeText = async (text: string): Promise<string> => {
 
     // Write a counterargument to the core argument
     const counterargument = await writeCounterargument(coreArgument);
-    return counterargument;
+
+    return {
+      containsArgument: Answer.Yes,
+      coreArgument,
+      counterargument,
+    }
   } else {
-    return "No argument found.";
+    return {
+      containsArgument: Answer.No,
+      coreArgument: null,
+      counterargument: null,
+    }
   }
 };
 
@@ -190,5 +205,7 @@ exports.analyzeText = functions.https.onRequest(async (request, response) => {
     );
   }
 
-  response.send(await analyzeText(request.body.text));
+  const analysis = await analyzeText(request.body.text)
+
+  response.json(analysis);
 });
