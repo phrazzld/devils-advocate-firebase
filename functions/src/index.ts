@@ -18,13 +18,24 @@ const configuration = new Configuration({
 const openai = new OpenAIApi(configuration);
 
 const PROMPTS = {
-  CONTAINS_ARGUMENT: 'Is this text making an argument? Answer "yes" or "no". ',
-  CORE_ARGUMENT: "Summarize the core argument of the following text (in one or two sentences): ",
-  WRITE_COUNTER: "Write a short, persuasive essay whose thesis is a counterargument to the following text: ",
+  CONTAINS_ARGUMENT: `
+Is this text making an argument? Answer "yes" or "no".
+`,
+  CORE_ARGUMENT: `
+Summarize the core argument of the following text (in one or two sentences):
+`,
+  REARTICULATED_CORE: `
+Write one persuasive paragraph that forwards the argument put forth in the following text:
+`,
+  WRITE_COUNTER: `
+Write a short, persuasive essay whose thesis is a counterargument to the following text:
+`,
 };
 
 const containsArgument = async (text: string): Promise<Answer> => {
-  functions.logger.info(`containsArgument core function, text: ${text}`, { structuredData: true });
+  functions.logger.info(`containsArgument core function, text: ${text}`, {
+    structuredData: true,
+  });
   const response = await openai.createCompletion({
     prompt: PROMPTS.CONTAINS_ARGUMENT.concat(text),
     model: "text-davinci-002",
@@ -35,7 +46,10 @@ const containsArgument = async (text: string): Promise<Answer> => {
     presence_penalty: 0,
     best_of: 1,
   });
-  functions.logger.info(`containsArgument core function, response.data: ${response.data}`, { structuredData: true });
+  functions.logger.info(
+    `containsArgument core function, response.data: ${response.data}`,
+    { structuredData: true }
+  );
 
   // Return "yes" or "no"
   const answer = response.data.choices[0].text;
@@ -48,7 +62,10 @@ const containsArgument = async (text: string): Promise<Answer> => {
 
 exports.containsArgument = functions.https.onRequest(
   async (request, response) => {
-  functions.logger.info(`containsArgument wrapper function, request.body: ${request.body}`, { structuredData: true });
+    functions.logger.info(
+      `containsArgument wrapper function, request.body: ${request.body}`,
+      { structuredData: true }
+    );
     // Ensure that the text argument is provided
     if (!request.body.text) {
       throw new functions.https.HttpsError(
@@ -72,7 +89,7 @@ exports.containsArgument = functions.https.onRequest(
 const getCoreArgument = async (text: string): Promise<string> => {
   const response = await openai.createCompletion({
     prompt: PROMPTS.CORE_ARGUMENT.concat(text),
-    model: "text-davinci-002",
+    model: "text-davinci-003",
     temperature: 0.5,
     max_tokens: 2048,
     top_p: 1,
@@ -113,11 +130,10 @@ exports.getCoreArgument = functions.https.onRequest(
   }
 );
 
-const writeCounterargument = async (text: string): Promise<string> => {
-  // Analyze the text using GPT-3's language modeling capabilities
+const rearticulateCoreArgument = async (text: string): Promise<string> => {
   const response = await openai.createCompletion({
-    prompt: PROMPTS.WRITE_COUNTER.concat(text),
-    model: "text-davinci-002",
+    prompt: PROMPTS.REARTICULATED_CORE.concat(text),
+    model: "text-davinci-003",
     temperature: 0.5,
     max_tokens: 2048,
     top_p: 1,
@@ -125,6 +141,55 @@ const writeCounterargument = async (text: string): Promise<string> => {
     presence_penalty: 0,
     best_of: 1,
   });
+
+  // If no rearticulated core argument was found, throw an error
+  if (!response.data.choices[0].text) {
+    throw new Error("No rearticulated core argument found.");
+  }
+
+  // Return the rearticulated core argument
+  return response.data.choices[0].text;
+};
+
+// Export rearticulateCoreArgument function
+exports.rearticulateCoreArgument = functions.https.onRequest(
+  async (request, response) => {
+    // Ensure that the text argument is provided
+    if (!request.body.text) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "The function must be called with one argument 'text' containing the text to analyze."
+      );
+    }
+
+    // Ensure that the caller has provided a string value for the text argument
+    if (typeof request.body.text !== "string") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "The function must be called with one argument 'text' containing the text to analyze."
+      );
+    }
+
+    response.send(await rearticulateCoreArgument(request.body.text));
+  }
+);
+
+const writeCounterargument = async (text: string): Promise<string> => {
+  // Analyze the text using GPT-3's language modeling capabilities
+  const response = await openai.createCompletion({
+    prompt: PROMPTS.WRITE_COUNTER.concat(text),
+    model: "text-davinci-003",
+    temperature: 0.5,
+    max_tokens: 2048,
+    top_p: 1,
+    frequency_penalty: 0,
+    presence_penalty: 0,
+    best_of: 1,
+  });
+  functions.logger.info(`writeCounterargument core function, response.data:`, {
+    structuredData: true,
+  });
+  functions.logger.info(response.data, { structuredData: true });
 
   // If no counterargument was found, throw an error
   if (!response.data.choices[0].text) {
@@ -160,6 +225,7 @@ exports.writeCounterargument = functions.https.onRequest(
 interface Analysis {
   containsArgument: Answer;
   coreArgument: string | null;
+  rearticulatedCore: string | null;
   counterargument: string | null;
 }
 
@@ -171,20 +237,25 @@ const analyzeText = async (text: string): Promise<Analysis> => {
   if (hasArg === Answer.Yes) {
     const coreArgument = await getCoreArgument(text);
 
+    // Rearticulate the core argument
+    const rearticulatedCore = await rearticulateCoreArgument(coreArgument);
+
     // Write a counterargument to the core argument
-    const counterargument = await writeCounterargument(coreArgument);
+    const counterargument = await writeCounterargument(rearticulatedCore);
 
     return {
       containsArgument: Answer.Yes,
       coreArgument,
+      rearticulatedCore,
       counterargument,
-    }
+    };
   } else {
     return {
       containsArgument: Answer.No,
       coreArgument: null,
+      rearticulatedCore: null,
       counterargument: null,
-    }
+    };
   }
 };
 
@@ -205,7 +276,7 @@ exports.analyzeText = functions.https.onRequest(async (request, response) => {
     );
   }
 
-  const analysis = await analyzeText(request.body.text)
+  const analysis = await analyzeText(request.body.text);
 
   response.json(analysis);
 });
