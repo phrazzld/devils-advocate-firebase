@@ -19,8 +19,8 @@ const openai = new OpenAIApi(configuration);
 
 const PROMPTS = {
   CONTAINS_ARGUMENT: 'Is this text making an argument? Answer "yes" or "no". ',
-  CORE_ARGUMENT: "What is the core argument of this text? ",
-  WRITE_COUNTER: "Write the most persuasive counterargument to the following text: ",
+  CORE_ARGUMENT: "Summarize the core argument of the following text (in one or two sentences): ",
+  WRITE_COUNTER: "Write a short, persuasive essay whose thesis is a counterargument to the following text: ",
 };
 
 const containsArgument = async (text: string): Promise<Answer> => {
