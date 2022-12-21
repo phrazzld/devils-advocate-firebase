@@ -145,7 +145,7 @@ interface Analysis {
   counterargument: string | null;
 }
 
-export const analyzeText = async (text: string): Promise<Analysis> => {
+export const analyze = async (text: string): Promise<Analysis> => {
   // Check if the text contains an argument
   const hasArg = await containsArgument(text);
 

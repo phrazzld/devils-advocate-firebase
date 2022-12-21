@@ -1,7 +1,7 @@
 import * as functions from "firebase-functions";
-import { analyzeText } from "./openai";
+import { analyze } from "./openai";
 
-exports.analyzeText = functions.https.onRequest(
+export const analyzeText = functions.https.onRequest(
   async (request, response): Promise<any> => {
     // Ensure that the text argument is provided
     if (!request.body.text) {
@@ -19,7 +19,7 @@ exports.analyzeText = functions.https.onRequest(
       );
     }
 
-    const analysis = await analyzeText(request.body.text);
+    const analysis = await analyze(request.body.text);
 
     return response.json(analysis);
   }
