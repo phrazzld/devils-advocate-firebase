@@ -143,6 +143,7 @@ interface Analysis {
   coreArgument: string | null;
   rearticulatedCore: string | null;
   counterargument: string | null;
+  numRequests: number;
 }
 
 export const analyze = async (text: string): Promise<Analysis> => {
@@ -164,6 +165,7 @@ export const analyze = async (text: string): Promise<Analysis> => {
       coreArgument,
       rearticulatedCore,
       counterargument,
+      numRequests: 4,
     };
   } else {
     return {
@@ -171,6 +173,7 @@ export const analyze = async (text: string): Promise<Analysis> => {
       coreArgument: null,
       rearticulatedCore: null,
       counterargument: null,
+      numRequests: 1,
     };
   }
 };

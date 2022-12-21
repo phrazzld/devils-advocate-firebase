@@ -1,20 +1,24 @@
+import * as sgMail from "@sendgrid/mail";
 import * as crypto from "crypto";
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
-import * as nodemailer from "nodemailer";
+/* import * as nodemailer from "nodemailer"; */
+
+sgMail.setApiKey(process.env.SENDGRID_API_KEY || "");
 
 admin.initializeApp();
 
 // Create a new Cloud Function that is triggered when a user submits a request
-exports.generateLicenseKey = functions.https.onRequest(
+export const generateLicenseKey = functions.https.onRequest(
   async (request, response): Promise<any> => {
     // Validate that the request includes the user's email address
     if (!request.body.email) {
       return response.status(400).json({ error: "Email address is required" });
     }
 
+    // TODO: Only generate a license key if the user has paid
+
     // Generate a random license key
-    // TODO: Replace this with a more secure method of generating a license key
     const licenseKey = crypto.randomBytes(32).toString("hex");
 
     // Save the license key and email address in the Firestore database
@@ -29,25 +33,17 @@ exports.generateLicenseKey = functions.https.onRequest(
 
     // Send an email to the user with their license key
     try {
-      // TODO: Configure the email transport
-      //       Manage credentials securely
-      const transporter = nodemailer.createTransport({
-        host: "smtp.gmail.com",
-        port: 465,
-        secure: true,
-        auth: {
-          user: "your-email@example.com",
-          pass: "your-email-password",
-        },
-      });
-
-      // TODO: Send the email
-      await transporter.sendMail({
-        from: "your-email@example.com",
+      // Write message containing license key
+      const msg = {
         to: request.body.email,
-        subject: "Your License Key",
-        text: `Your license key is: ${licenseKey}`,
-      });
+        from: "devils-advocate.hydat@simplelogin.com",
+        subject: "Your license key for Devil's Advocate",
+        text: `Your license key is ${licenseKey}`,
+        html: `Your license key is <strong>${licenseKey}</strong>`,
+      };
+
+      // Send email
+      await sgMail.send(msg);
     } catch (error) {
       return response.status(500).json({ error: "Error sending email" });
     }
