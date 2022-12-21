@@ -145,7 +145,7 @@ interface Analysis {
   counterargument: string | null;
 }
 
-const analyzeText = async (text: string): Promise<Analysis> => {
+export const analyzeText = async (text: string): Promise<Analysis> => {
   // Check if the text contains an argument
   const hasArg = await containsArgument(text);
 
@@ -174,25 +174,3 @@ const analyzeText = async (text: string): Promise<Analysis> => {
     };
   }
 };
-
-exports.analyzeText = functions.https.onRequest(async (request, response) => {
-  // Ensure that the text argument is provided
-  if (!request.body.text) {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "The function must be called with one argument 'text' containing the text to analyze."
-    );
-  }
-
-  // Ensure that the caller has provided a string value for the text argument
-  if (typeof request.body.text !== "string") {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "The function must be called with one argument 'text' containing the text to analyze."
-    );
-  }
-
-  const analysis = await analyzeText(request.body.text);
-
-  response.json(analysis);
-});
